@@ -14,12 +14,6 @@ Flow:
   5. Return filled OrderResult
 """
 
-<<<<<<< HEAD
-
-from __future__ import annotations
-
-=======
->>>>>>> 573fc92 (fix trade executor)
 import datetime
 import uuid
 from typing import Optional
