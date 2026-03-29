@@ -1,23 +1,61 @@
-# Core
-python-dotenv==1.0.1
-sqlalchemy==2.0.30
-psycopg2-binary==2.9.9
-apscheduler==3.10.4
-pytz==2024.1
-requests==2.32.3
-httpx==0.27.0
+"""
+api/client_factory.py
+Creates and returns an authenticated Webull client.
+"""
 
-# Webull API
-webull==0.3.0
+import os
+from webull import webull
+from utils.logger import get_logger
 
-# Technical indicators
-pandas==2.0.3
-numpy==1.24.4
+logger = get_logger(__name__)
 
-# Scheduling / utils
-schedule==1.2.1
-python-dateutil==2.9.0
 
-# Dev/testing
-pytest==8.2.0
-pytest-asyncio==0.23.6
+def get_client() -> webull:
+    """
+    Create and return an authenticated Webull client using environment variables.
+    Expected environment variables:
+        WEBULL_USERNAME
+        WEBULL_PASSWORD
+        WEBULL_DEVICE_ID
+        WEBULL_TRADE_PIN
+        WEBULL_MFA_CODE (optional)
+    """
+
+    username   = os.getenv("WEBULL_USERNAME")
+    password   = os.getenv("WEBULL_PASSWORD")
+    device_id  = os.getenv("WEBULL_DEVICE_ID")
+    trade_pin  = os.getenv("WEBULL_TRADE_PIN")
+    mfa_code   = os.getenv("WEBULL_MFA_CODE")  # optional
+
+    if not all([username, password, device_id, trade_pin]):
+        logger.critical("Missing one or more required Webull environment variables")
+        raise RuntimeError("Webull credentials not fully configured")
+
+    wb = webull()  # US Webull client
+
+    logger.info("Logging into Webull…")
+
+    # Step 1 — Login
+    login_response = wb.login(
+        username=username,
+        password=password,
+        device_id=device_id,
+        mfa=mfa_code
+    )
+
+    if "accessToken" not in login_response:
+        logger.critical("Webull login failed: %s", login_response)
+        raise RuntimeError("Webull login failed")
+
+    logger.info("Webull login successful")
+
+    # Step 2 — Trade token (PIN)
+    token_response = wb.get_trade_token(trade_pin)
+
+    if token_response is False:
+        logger.critical("Failed to obtain Webull trade token")
+        raise RuntimeError("Trade token failed")
+
+    logger.info("Trade token obtained successfully")
+
+    return wb
