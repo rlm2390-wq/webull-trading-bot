@@ -16,7 +16,6 @@ from __future__ import annotations
 from typing import List
 
 from api.client_factory  import get_client
-from api.market_data     import has_earnings_within
 from config.settings     import (
     AGGRESSIVE_TICKERS,
     AGGRESSIVE_TRIM_RULES,
