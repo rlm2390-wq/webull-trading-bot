@@ -19,7 +19,6 @@ from typing import Optional
 import sqlalchemy as sa
 
 from api.client_factory import get_client
-from api.webull_client  import OrderResult
 from core.risk_manager  import TradeProposal, TradeDecision, RiskManager
 from config.settings    import DRY_RUN
 from db.database        import get_db
