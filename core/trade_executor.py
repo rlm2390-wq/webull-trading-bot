@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 PAPER_TRADING = True
 
 """
@@ -11,6 +13,7 @@ Flow:
   4. Log to trades_log
   5. Return filled OrderResult
 """
+
 
 from __future__ import annotations
 
