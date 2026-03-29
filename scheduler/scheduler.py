@@ -1,15 +1,6 @@
 """
 trading_engine/scheduler/scheduler.py
 APScheduler configuration implementing the full weekly rhythm.
-
-Weekly Rhythm:
-  Monday    09:35 ET — deploy cash, prioritize underweights and dips
-  Wednesday 09:35 ET — covered call scan, aggressive spike trims, capture entries
-  Friday    14:45 ET — engine rebalance, ticker rebalance, capture exits
-  Daily     09:35 ET — update state, dip/spike logic, safety checks
-  Daily     15:45 ET — end-of-day state snapshot + stale order cleanup
-
-All times in US/Eastern. Jobs skip automatically on weekends and market holidays.
 """
 
 from __future__ import annotations
@@ -23,7 +14,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
 from core.decision_loop import DecisionLoop
-from db.database        import health_check, init_db
+from core.scheduler_log import task_run
+from db.database        import health_check
 from utils.logger       import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -61,7 +53,6 @@ MARKET_HOLIDAYS = MARKET_HOLIDAYS_2025 | MARKET_HOLIDAYS_2026
 
 
 def is_market_day() -> bool:
-    """Return True if today is a trading day (Mon–Fri, not a holiday)."""
     today = datetime.date.today()
     if today.weekday() >= 5:
         return False
@@ -70,8 +61,12 @@ def is_market_day() -> bool:
     return True
 
 
+def is_early_trading() -> bool:
+    now = datetime.datetime.now(ET).time()
+    return datetime.time(4, 0) <= now < datetime.time(9, 30)
+
+
 def get_day_mode() -> str:
-    """Return the scheduler mode for today."""
     dow = datetime.date.today().weekday()
     return {0: "monday", 2: "wednesday", 4: "friday"}.get(dow, "daily")
 
@@ -84,6 +79,11 @@ _loop = DecisionLoop()
 
 
 def job_morning_run():
+    logger.info("Heartbeat: scheduler is alive (morning run)")
+
+    if is_early_trading():
+        logger.info("Early trading session — full engines allowed (Option A)")
+
     if not is_market_day():
         logger.info("Market closed today — skipping morning run")
         return
@@ -91,7 +91,7 @@ def job_morning_run():
     mode = get_day_mode()
     logger.info("▶ MORNING RUN | mode=%s", mode)
 
-    try:
+    with task_run(f"morning_{mode}"):
         if mode == "monday":
             _loop.run_monday()
         elif mode == "wednesday":
@@ -100,30 +100,36 @@ def job_morning_run():
             _loop.run_friday()
         else:
             _loop.run_daily()
-    except Exception as exc:
-        logger.exception("Morning run failed: %s", exc)
-
-
-def job_eod_run():
-    if not is_market_day():
-        return
-
-    logger.info("▶ EOD RUN")
-    try:
-        _loop.run_daily()
-    except Exception as exc:
-        logger.exception("EOD run failed: %s", exc)
 
 
 def job_midday_check():
+    logger.info("Heartbeat: scheduler is alive (midday check)")
+
+    if is_early_trading():
+        logger.info("Early trading session — full engines allowed (Option A)")
+
     if not is_market_day():
         return
 
-    logger.info("▶ MIDDAY CHECK")
-    try:
+    with task_run("midday_check"):
         _loop.run_daily()
-    except Exception as exc:
-        logger.exception("Midday check failed: %s", exc)
+
+
+def job_eod_run():
+    logger.info("Heartbeat: scheduler is alive (EOD run)")
+
+    if is_early_trading():
+        logger.info("Early trading session — full engines allowed (Option A)")
+
+    if not is_market_day():
+        return
+
+    with task_run("eod_run"):
+        _loop.run_daily()
+
+
+def job_heartbeat():
+    logger.info("Heartbeat: scheduler is alive")
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +146,15 @@ def on_job_error(event):
 
 def build_scheduler() -> BlockingScheduler:
     scheduler = BlockingScheduler(timezone=ET)
+
+    # Heartbeat FIRST so it always registers
+    scheduler.add_job(
+        job_heartbeat,
+        trigger="interval",
+        minutes=5,
+        id="heartbeat",
+        name="Scheduler Heartbeat",
+    )
 
     scheduler.add_job(
         job_morning_run,
@@ -206,8 +221,9 @@ def main():
 
     logger.info("Scheduler started. Jobs:")
 
+    now = datetime.datetime.now(ET)
     for job in scheduler.get_jobs():
-        next_run = job.trigger.get_next_fire_time(None, datetime.datetime.now())
+        next_run = job.trigger.get_next_fire_time(None, now)
         logger.info("  • %s — next run: %s", job.name, next_run)
 
     scheduler.start()

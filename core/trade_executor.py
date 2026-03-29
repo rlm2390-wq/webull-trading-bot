@@ -1,3 +1,5 @@
+PAPER_TRADING = True
+
 """
 trading_engine/core/trade_executor.py
 Converts approved TradeProposals into Webull orders and logs them to the DB.
@@ -36,7 +38,7 @@ class TradeExecutor:
     # Public entry point
     # ------------------------------------------------------------------
 
-    def execute(self, proposal: TradeProposal) -> Optional[OrderResult]:
+    def execute(self, proposal: TradeProposal) -> Optional["OrderResult"]:
         """
         Gate through risk, then execute.
         Returns OrderResult on success, None if blocked or failed.
@@ -51,7 +53,7 @@ class TradeExecutor:
             self.risk.record_trade()
         return result
 
-    def execute_many(self, proposals: list[TradeProposal]) -> list[OrderResult]:
+    def execute_many(self, proposals: list[TradeProposal]) -> list["OrderResult"]:
         results = []
         for p in proposals:
             # Re-check limits before each trade (counters update as we go)
@@ -70,8 +72,31 @@ class TradeExecutor:
     # Order placement
     # ------------------------------------------------------------------
 
-    def _place_order(self, p: TradeProposal) -> Optional[OrderResult]:
+    def _place_order(self, p: TradeProposal) -> Optional["OrderResult"]:
         client = get_client()
+
+        # --------------------------------------------------------------
+        # PAPER TRADING SAFETY SWITCH
+        # --------------------------------------------------------------
+        if PAPER_TRADING:
+            logger.info(
+                "[PAPER TRADE] %s %s %s | value=$%.2f | reason=%s",
+                p.engine.upper(), p.action, p.ticker,
+                p.value_usd, p.reason
+            )
+
+            # Create a fake OrderResult-like object
+            class FakeResult:
+                def __init__(self):
+                    self.order_id = f"paper-{uuid.uuid4()}"
+                    self.shares   = p.shares or 0
+                    self.price    = p.price or 0
+                    self.status   = "paper"
+                    self.dry_run  = True
+
+            return FakeResult()
+        # --------------------------------------------------------------
+
         try:
             # Calculate shares from dollar value
             if p.shares and p.shares > 0:
@@ -93,6 +118,7 @@ class TradeExecutor:
                     limit = round(p.price * 1.0005, 4)
                 else:
                     limit = round(p.price * 0.9995, 4)
+
                 result = client.place_limit_order(
                     ticker=p.ticker, action=p.action,
                     shares=shares, price=limit, reason=p.reason,
@@ -121,7 +147,7 @@ class TradeExecutor:
     # DB logging
     # ------------------------------------------------------------------
 
-    def _log_trade(self, p: TradeProposal, r: OrderResult) -> None:
+    def _log_trade(self, p: TradeProposal, r: "OrderResult") -> None:
         with get_db() as db:
             db.execute(sa.text("""
                 INSERT INTO trades_log
