@@ -8,7 +8,7 @@ requests==2.32.3
 httpx==0.27.0
 
 # Webull API
-webull==0.3.11          # unofficial Python client
+webull==0.3.0           # unofficial Python client
 # If webull package is unavailable, fall back to direct REST calls via httpx
 
 # Technical indicators
