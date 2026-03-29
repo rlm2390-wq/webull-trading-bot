@@ -19,7 +19,6 @@ from typing import Optional
 import sqlalchemy as sa
 
 from api.client_factory import get_client
-from api.webull_client  import Position, CashBalance
 from core.portfolio     import (
     PortfolioState, TickerPosition, EngineAllocation,
     TICKER_ENGINE,
