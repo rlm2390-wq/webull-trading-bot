@@ -32,16 +32,16 @@ ET = pytz.timezone("America/New_York")
 
 # US market holidays (update annually)
 MARKET_HOLIDAYS_2025 = {
-    datetime.date(2025, 1,  1),   # New Year's Day
-    datetime.date(2025, 1, 20),   # MLK Day
-    datetime.date(2025, 2, 17),   # Presidents' Day
-    datetime.date(2025, 4, 18),   # Good Friday
-    datetime.date(2025, 5, 26),   # Memorial Day
-    datetime.date(2025, 6, 19),   # Juneteenth
-    datetime.date(2025, 7,  4),   # Independence Day
-    datetime.date(2025, 9,  1),   # Labor Day
-    datetime.date(2025, 11, 27),  # Thanksgiving
-    datetime.date(2025, 12, 25),  # Christmas
+    datetime.date(2025, 1,  1),
+    datetime.date(2025, 1, 20),
+    datetime.date(2025, 2, 17),
+    datetime.date(2025, 4, 18),
+    datetime.date(2025, 5, 26),
+    datetime.date(2025, 6, 19),
+    datetime.date(2025, 7,  4),
+    datetime.date(2025, 9,  1),
+    datetime.date(2025, 11, 27),
+    datetime.date(2025, 12, 25),
 }
 
 MARKET_HOLIDAYS_2026 = {
@@ -63,7 +63,7 @@ MARKET_HOLIDAYS = MARKET_HOLIDAYS_2025 | MARKET_HOLIDAYS_2026
 def is_market_day() -> bool:
     """Return True if today is a trading day (Mon–Fri, not a holiday)."""
     today = datetime.date.today()
-    if today.weekday() >= 5:       # Saturday=5, Sunday=6
+    if today.weekday() >= 5:
         return False
     if today in MARKET_HOLIDAYS:
         return False
@@ -72,24 +72,25 @@ def is_market_day() -> bool:
 
 def get_day_mode() -> str:
     """Return the scheduler mode for today."""
-    dow = datetime.date.today().weekday()  # 0=Mon, 4=Fri
+    dow = datetime.date.today().weekday()
     return {0: "monday", 2: "wednesday", 4: "friday"}.get(dow, "daily")
 
 
 # ---------------------------------------------------------------------------
-# Job functions (called by APScheduler)
+# Job functions
 # ---------------------------------------------------------------------------
 
 _loop = DecisionLoop()
 
 
 def job_morning_run():
-    """Morning run at 09:35 ET — main decision loop."""
     if not is_market_day():
         logger.info("Market closed today — skipping morning run")
         return
+
     mode = get_day_mode()
     logger.info("▶ MORNING RUN | mode=%s", mode)
+
     try:
         if mode == "monday":
             _loop.run_monday()
@@ -104,9 +105,9 @@ def job_morning_run():
 
 
 def job_eod_run():
-    """End-of-day run at 15:45 ET — state snapshot, stale order cleanup."""
     if not is_market_day():
         return
+
     logger.info("▶ EOD RUN")
     try:
         _loop.run_daily()
@@ -115,9 +116,9 @@ def job_eod_run():
 
 
 def job_midday_check():
-    """Optional midday check at 12:00 ET — dip detection only."""
     if not is_market_day():
         return
+
     logger.info("▶ MIDDAY CHECK")
     try:
         _loop.run_daily()
@@ -130,8 +131,7 @@ def job_midday_check():
 # ---------------------------------------------------------------------------
 
 def on_job_executed(event):
-    logger.debug("Job executed: %s in %.1fs", event.job_id,
-                 (event.scheduled_run_time - datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)).total_seconds())
+    logger.debug("Job executed: %s", event.job_id)
 
 
 def on_job_error(event):
@@ -141,44 +141,41 @@ def on_job_error(event):
 def build_scheduler() -> BlockingScheduler:
     scheduler = BlockingScheduler(timezone=ET)
 
-    # Morning run — Mon through Fri at 09:35 ET
     scheduler.add_job(
         job_morning_run,
-        trigger  = "cron",
-        day_of_week = "mon-fri",
-        hour     = 9,
-        minute   = 35,
-        id       = "morning_run",
-        name     = "Morning Decision Loop",
-        misfire_grace_time = 300,    # tolerate up to 5 min late start
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=9,
+        minute=35,
+        id="morning_run",
+        name="Morning Decision Loop",
+        misfire_grace_time=300,
     )
 
-    # Midday check — Mon through Fri at 12:00 ET
     scheduler.add_job(
         job_midday_check,
-        trigger  = "cron",
-        day_of_week = "mon-fri",
-        hour     = 12,
-        minute   = 0,
-        id       = "midday_check",
-        name     = "Midday Dip Check",
-        misfire_grace_time = 300,
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=12,
+        minute=0,
+        id="midday_check",
+        name="Midday Dip Check",
+        misfire_grace_time=300,
     )
 
-    # EOD run — Mon through Fri at 15:45 ET
     scheduler.add_job(
         job_eod_run,
-        trigger  = "cron",
-        day_of_week = "mon-fri",
-        hour     = 15,
-        minute   = 45,
-        id       = "eod_run",
-        name     = "End-of-Day Snapshot",
-        misfire_grace_time = 300,
+        trigger="cron",
+        day_of_week="mon-fri",
+        hour=15,
+        minute=45,
+        id="eod_run",
+        name="End-of-Day Snapshot",
+        misfire_grace_time=300,
     )
 
     scheduler.add_listener(on_job_executed, EVENT_JOB_EXECUTED)
-    scheduler.add_listener(on_job_error,    EVENT_JOB_ERROR)
+    scheduler.add_listener(on_job_error, EVENT_JOB_ERROR)
 
     return scheduler
 
@@ -191,29 +188,27 @@ def main():
     setup_logging()
     logger.info("Trading Engine starting up...")
 
-    # Verify DB
     if not health_check():
         logger.critical("Database unreachable — aborting")
         sys.exit(1)
+
     logger.info("Database OK")
 
     scheduler = build_scheduler()
 
-    # Graceful shutdown on SIGINT / SIGTERM
     def shutdown(signum, frame):
         logger.info("Shutdown signal received — stopping scheduler")
         scheduler.shutdown(wait=False)
         sys.exit(0)
 
-    signal.signal(signal.SIGINT,  shutdown)
+    signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
     logger.info("Scheduler started. Jobs:")
-  from datetime import datetime
 
-for job in scheduler.get_jobs():
-    next_run = job.trigger.get_next_fire_time(None, datetime.now())
-    logger.info("  • %s — next run: %s", job.name, next_run)
+    for job in scheduler.get_jobs():
+        next_run = job.trigger.get_next_fire_time(None, datetime.datetime.now())
+        logger.info("  • %s — next run: %s", job.name, next_run)
 
     scheduler.start()
 
