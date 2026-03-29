@@ -1,0 +1,25 @@
+# Core
+python-dotenv==1.0.1
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+apscheduler==3.10.4
+pytz==2024.1
+requests==2.32.3
+httpx==0.27.0
+
+# Webull API
+webull==0.3.11          # unofficial Python client
+# If webull package is unavailable, fall back to direct REST calls via httpx
+
+# Technical indicators
+pandas==2.2.2
+numpy==1.26.4
+pandas-ta==0.3.14b0     # RSI and other indicators
+
+# Scheduling / utils
+schedule==1.2.1
+python-dateutil==2.9.0
+
+# Dev/testing
+pytest==8.2.0
+pytest-asyncio==0.23.6
