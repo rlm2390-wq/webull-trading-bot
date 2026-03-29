@@ -210,7 +210,10 @@ def main():
 
     logger.info("Scheduler started. Jobs:")
     for job in scheduler.get_jobs():
-        logger.info("  • %s — next run: %s", job.name, job.next_run_time)
+from datetime import datetime
+
+next_run = job.trigger.get_next_fire_time(None, datetime.now())
+logger.info("  • %s — next run: %s", job.name, next_run)
 
     scheduler.start()
 
