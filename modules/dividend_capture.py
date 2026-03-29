@@ -34,7 +34,6 @@ from typing import List, Optional
 import sqlalchemy as sa
 
 from api.client_factory  import get_client
-from api.market_data     import fetch_rsi, has_earnings_within, is_bad_day
 from config.settings     import (
     DIVIDEND_CAPTURE_TICKERS,
     CAPTURE_EX_DATE_WINDOW,
