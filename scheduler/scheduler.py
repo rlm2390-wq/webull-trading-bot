@@ -209,11 +209,11 @@ def main():
     signal.signal(signal.SIGTERM, shutdown)
 
     logger.info("Scheduler started. Jobs:")
-    for job in scheduler.get_jobs():
-from datetime import datetime
+  from datetime import datetime
 
-next_run = job.trigger.get_next_fire_time(None, datetime.now())
-logger.info("  • %s — next run: %s", job.name, next_run)
+for job in scheduler.get_jobs():
+    next_run = job.trigger.get_next_fire_time(None, datetime.now())
+    logger.info("  • %s — next run: %s", job.name, next_run)
 
     scheduler.start()
 
