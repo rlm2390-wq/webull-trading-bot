@@ -18,7 +18,7 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-from utils.logger   import setup_logging
+from logger import setup_logging
 from db.database    import health_check, init_db
 from utils.logger   import get_logger
 
