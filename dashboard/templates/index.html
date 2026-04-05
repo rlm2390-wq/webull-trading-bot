@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Bot Dashboard</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #21262d;
+      --border:      #30363d;
+      --text:        #e6edf3;
+      --muted:       #8b949e;
+      --accent:      #58a6ff;
+      --green:       #3fb950;
+      --red:         #f85149;
+      --yellow:      #d29922;
+      --orange:      #e3b341;
+      --purple:      #bc8cff;
+      --radius:      8px;
+      --font:        'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 span.dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    #refresh-info {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Cards ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card-header .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .card-body { padding: 20px; }
+
+    /* ── Metric grid ──────────────────────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .metric {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Risk banner ──────────────────────────────────────────────────── */
+    #risk-banner {
+      display: none;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+
+    #risk-banner.normal   { background: #1a2a1a; border-color: var(--green);  color: var(--green);  }
+    #risk-banner.caution  { background: #2a2200; border-color: var(--yellow); color: var(--yellow); }
+    #risk-banner.elevated { background: #2a1500; border-color: var(--orange); color: var(--orange); }
+    #risk-banner.critical { background: #2a0a0a; border-color: var(--red);    color: var(--red);    }
+
+    /* ── Tables ───────────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    thead th.num { text-align: right; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    tbody td {
+      padding: 10px 14px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Colour helpers ───────────────────────────────────────────────── */
+    .pos  { color: var(--green); }
+    .neg  { color: var(--red);   }
+    .neu  { color: var(--muted); }
+
+    /* ── Engine badges ────────────────────────────────────────────────── */
+    .engine-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .engine-aggressive { background: #2d1b1b; color: #f85149; border: 1px solid #f85149; }
+    .engine-moderate   { background: #1b2a1b; color: #3fb950; border: 1px solid #3fb950; }
+    .engine-safe       { background: #1b1f2d; color: #58a6ff; border: 1px solid #58a6ff; }
+    .engine-capture    { background: #2a1f2d; color: #bc8cff; border: 1px solid #bc8cff; }
+
+    /* ── Action badges ────────────────────────────────────────────────── */
+    .action-buy  { color: var(--green); font-weight: 600; }
+    .action-sell { color: var(--red);   font-weight: 600; }
+
+    /* ── Status badges ────────────────────────────────────────────────── */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .status-filled    { background: #1a2a1a; color: var(--green);  border: 1px solid var(--green);  }
+    .status-pending   { background: #2a2200; color: var(--yellow); border: 1px solid var(--yellow); }
+    .status-cancelled { background: #1e1e1e; color: var(--muted);  border: 1px solid var(--border); }
+    .status-failed    { background: #2a0a0a; color: var(--red);    border: 1px solid var(--red);    }
+
+    /* ── Dry-run tag ──────────────────────────────────────────────────── */
+    .dry-run-tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #2a2200;
+      color: var(--yellow);
+      border: 1px solid var(--yellow);
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    /* ── Empty state ──────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── Error state ──────────────────────────────────────────────────── */
+    .error-state {
+      text-align: center;
+      padding: 20px;
+      color: var(--red);
+      font-size: 13px;
+    }
+
+    /* ── Loading skeleton ─────────────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+      height: 1em;
+      display: inline-block;
+      width: 80px;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      main { padding: 12px; gap: 16px; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .metric-value { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <span class="dot"></span>
+    Trading Bot Dashboard
+  </h1>
+  <span id="refresh-info">Refreshing in <span id="countdown">30</span>s &nbsp;·&nbsp; Last updated: <span id="last-updated">—</span></span>
+</header>
+
+<main>
+
+  <!-- ── Risk banner ──────────────────────────────────────────────────── -->
+  <div id="risk-banner"></div>
+
+  <!-- ── Portfolio summary ────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Portfolio Summary</h2>
+      <span id="summary-as-of" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="card-body">
+      <div class="metrics-grid" id="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Portfolio Value</div>
+          <div class="metric-value" id="m-portfolio"><span class="skeleton"></span></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Cash Balance</div>
+          <div class="metric-value" id="m-cash"><span class="skeleton"></span></div>
+          <div class="metric-sub" id="m-cash-pct"></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Deployed Today</div>
+          <div class="metric-value" id="m-deployed-today"><span class="skeleton"></span></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Deployed This Week</div>
+          <div class="metric-value" id="m-deployed-week"><span class="skeleton"></span></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Dividends Received</div>
+          <div class="metric-value" id="m-dividends"><span class="skeleton"></span></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Premiums Received</div>
+          <div class="metric-value" id="m-premiums"><span class="skeleton"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Open positions ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Open Positions</h2>
+      <span id="positions-count" class="badge" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted)">—</span>
+    </div>
+    <div class="table-wrap">
+      <table id="positions-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Engine</th>
+            <th class="num">Shares</th>
+            <th class="num">Avg Cost</th>
+            <th class="num">Current Price</th>
+            <th class="num">Market Value</th>
+            <th class="num">Unrealized P&amp;L</th>
+            <th class="num">P&amp;L %</th>
+            <th class="num">% of Portfolio</th>
+          </tr>
+        </thead>
+        <tbody id="positions-body">
+          <tr><td colspan="9" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Recent trades ────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Trades</h2>
+      <span style="font-size:12px;color:var(--muted)">Last 50</span>
+    </div>
+    <div class="table-wrap">
+      <table id="trades-table">
+        <thead>
+          <tr>
+            <th>Date / Time</th>
+            <th>Ticker</th>
+            <th>Engine</th>
+            <th>Action</th>
+            <th>Reason</th>
+            <th class="num">Shares</th>
+            <th class="num">Limit Price</th>
+            <th class="num">Fill Price</th>
+            <th class="num">Fill Value</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="trades-body">
+          <tr><td colspan="10" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Formatting helpers ─────────────────────────────────────────────────
+  const fmt$ = (v, decimals = 2) =>
+    v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+  const fmtN = (v, decimals = 4) =>
+    v == null ? '—' : Number(v).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+  const fmtPct = (v, decimals = 2) =>
+    v == null ? '—' : (Number(v) * 100).toFixed(decimals) + '%';
+
+  const fmtTs = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const colorClass = (v) => v == null ? '' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
+
+  const engineBadge = (e) => {
+    const cls = `engine-${(e || 'safe').toLowerCase()}`;
+    return `<span class="engine-badge ${cls}">${e || '—'}</span>`;
+  };
+
+  const statusBadge = (s) => {
+    const cls = `status-${(s || 'pending').toLowerCase()}`;
+    return `<span class="status-badge ${cls}">${s || '—'}</span>`;
+  };
+
+  // ── Fetch helpers ──────────────────────────────────────────────────────
+  async function fetchJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // ── Summary ────────────────────────────────────────────────────────────
+  async function loadSummary() {
+    try {
+      const d = await fetchJSON('/api/summary');
+      document.getElementById('m-portfolio').textContent    = fmt$(d.portfolio_value);
+      document.getElementById('m-cash').textContent         = fmt$(d.cash_balance);
+      document.getElementById('m-cash-pct').textContent     = fmtPct(d.cash_pct) + ' of portfolio';
+      document.getElementById('m-deployed-today').textContent = fmt$(d.deployed_today);
+      document.getElementById('m-deployed-week').textContent  = fmt$(d.deployed_this_week);
+      document.getElementById('m-dividends').textContent    = fmt$(d.source_dividends);
+      document.getElementById('m-premiums').textContent     = fmt$(d.source_premiums);
+
+      if (d.recorded_at) {
+        document.getElementById('summary-as-of').textContent = 'as of ' + fmtTs(d.recorded_at);
+      }
+
+      // Colour cash % — warn if below 3%
+      const cashPct = Number(d.cash_pct) * 100;
+      const cashEl  = document.getElementById('m-cash');
+      cashEl.className = 'metric-value ' + (cashPct < 3 ? 'neg' : cashPct > 8 ? 'pos' : '');
+    } catch (e) {
+      document.getElementById('m-portfolio').innerHTML = '<span style="color:var(--red);font-size:13px">Error loading data</span>';
+    }
+  }
+
+  // ── Risk state ─────────────────────────────────────────────────────────
+  async function loadRisk() {
+    const banner = document.getElementById('risk-banner');
+    try {
+      const d = await fetchJSON('/api/risk');
+      const mode = (d.risk_mode || 'normal').toLowerCase();
+
+      const labels = {
+        normal:            '✓ Risk mode: Normal — all engines active',
+        caution:           '⚠ Risk mode: Caution',
+        pause_capture:     '⚠ Risk mode: Capture trades paused',
+        pause_aggressive:  '⚠ Risk mode: Aggressive buys paused',
+        safe_only:         '🔴 Risk mode: Safe-only — drawdown protection active',
+      };
+
+      const cssClass = mode === 'normal' ? 'normal'
+                     : mode === 'safe_only' ? 'critical'
+                     : mode.startsWith('pause') ? 'elevated'
+                     : 'caution';
+
+      let text = labels[mode] || `Risk mode: ${d.risk_mode}`;
+      if (d.drawdown_pct) text += `  ·  Drawdown: ${fmtPct(d.drawdown_pct)}`;
+      if (d.trades_today != null) text += `  ·  Trades today: ${d.trades_today}`;
+      if (d.trades_this_week != null) text += `  ·  This week: ${d.trades_this_week}`;
+
+      banner.textContent = text;
+      banner.className   = cssClass;
+      banner.style.display = 'block';
+    } catch (_) {
+      banner.style.display = 'none';
+    }
+  }
+
+  // ── Positions ──────────────────────────────────────────────────────────
+  async function loadPositions() {
+    const tbody = document.getElementById('positions-body');
+    const countEl = document.getElementById('positions-count');
+    try {
+      const rows = await fetchJSON('/api/positions');
+      countEl.textContent = rows.length + ' position' + (rows.length !== 1 ? 's' : '');
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No open positions found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const pnlClass = colorClass(r.unrealized_pnl);
+        const pnlPct   = r.unrealized_pct != null ? ` (${fmtPct(r.unrealized_pct)})` : '';
+        return `<tr>
+          <td><strong>${r.ticker}</strong></td>
+          <td>${engineBadge(r.engine)}</td>
+          <td class="num">${fmtN(r.shares, 4)}</td>
+          <td class="num">${fmt$(r.avg_cost, 4)}</td>
+          <td class="num">${fmt$(r.current_price, 4)}</td>
+          <td class="num">${fmt$(r.market_value)}</td>
+          <td class="num ${pnlClass}">${fmt$(r.unrealized_pnl)}${pnlPct}</td>
+          <td class="num ${colorClass(r.unrealized_pct)}">${fmtPct(r.unrealized_pct)}</td>
+          <td class="num">${fmtPct(r.pct_of_portfolio)}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="9" class="error-state">Failed to load positions: ${e.message}</td></tr>`;
+    }
+  }
+
+  // ── Trades ─────────────────────────────────────────────────────────────
+  async function loadTrades() {
+    const tbody = document.getElementById('trades-body');
+    try {
+      const rows = await fetchJSON('/api/trades');
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No trades found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const actionCls = r.action === 'BUY' ? 'action-buy' : 'action-sell';
+        const dryTag    = r.dry_run ? '<span class="dry-run-tag">DRY</span>' : '';
+        return `<tr>
+          <td>${fmtTs(r.placed_at)}</td>
+          <td><strong>${r.ticker}</strong>${dryTag}</td>
+          <td>${engineBadge(r.engine)}</td>
+          <td class="${actionCls}">${r.action}</td>
+          <td style="color:var(--muted)">${r.reason || '—'}</td>
+          <td class="num">${fmtN(r.shares, 4)}</td>
+          <td class="num">${fmt$(r.limit_price, 4)}</td>
+          <td class="num">${fmt$(r.fill_price, 4)}</td>
+          <td class="num">${fmt$(r.fill_value)}</td>
+          <td>${statusBadge(r.status)}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="10" class="error-state">Failed to load trades: ${e.message}</td></tr>`;
+    }
+  }
+
+  // ── Refresh loop ───────────────────────────────────────────────────────
+  const REFRESH_INTERVAL = 30; // seconds
+  let countdown = REFRESH_INTERVAL;
+
+  function updateLastUpdated() {
+    const now = new Date();
+    document.getElementById('last-updated').textContent =
+      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+
+  async function refreshAll() {
+    await Promise.allSettled([loadSummary(), loadRisk(), loadPositions(), loadTrades()]);
+    updateLastUpdated();
+    countdown = REFRESH_INTERVAL;
+  }
+
+  function startCountdown() {
+    setInterval(() => {
+      countdown -= 1;
+      document.getElementById('countdown').textContent = countdown;
+      if (countdown <= 0) {
+        countdown = REFRESH_INTERVAL;
+        refreshAll();
+      }
+    }, 1000);
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────
+  refreshAll();
+  startCountdown();
+</script>
+</body>
+</html>
